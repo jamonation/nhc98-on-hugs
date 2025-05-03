@@ -229,5 +229,11 @@ docker run -it nhc98-and-hugs:1.22
 1029bd37ce7f:/#
 ```
 
-I'll add a copy here, but I wouldn't recommend using it for anything but experimenting. After all, you
+I've added a copy here, but I wouldn't recommend using it for anything but experimenting. After all, you
 wouldn't run any random container image that you found in a parking lot would you?
+
+Regardless, here it is:
+
+```bash
+docker pull ghcr.io/jamonation/nhc98-and-hugs:1.22
+```
