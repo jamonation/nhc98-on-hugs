@@ -1,0 +1,14 @@
+diff --git a/src/prelude/NonStd/NonStdTraceBootstrap.hs b/src/prelude/NonStd/NonStdTraceBootstrap.hs
+new file mode 100644
+index 0000000..248cd87
+--- /dev/null
++++ b/src/prelude/NonStd/NonStdTraceBootstrap.hs
+@@ -0,0 +1,8 @@
++module NonStdTraceBootstrap where
++
++import IO
++
++
++trace :: String -> a -> a
++trace [] a = a
++trace (x:xs) a = hPutChar stderr x `seq` trace xs a

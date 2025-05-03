@@ -1,0 +1,200 @@
+From 9eb2a2066eb9f93e60e447aab28479af6c8b9759 Mon Sep 17 00:00:00 2001
+From: Ricardo Wurmus <rekado@elephly.net>
+Date: Sat, 7 Jan 2017 22:31:41 +0100
+Subject: [PATCH] Split up CTypes
+
+This is necessary to avoid a control stack overflow in Hugs when
+building the FFI library with nhc98 running on Hugs.
+---
+ src/prelude/FFI/CStrings.hs     |  2 ++
+ src/prelude/FFI/CTypes.hs       | 14 --------------
+ src/prelude/FFI/CTypes1.hs      | 20 ++++++++++++++++++++
+ src/prelude/FFI/CTypes2.hs      | 22 ++++++++++++++++++++++
+ src/prelude/FFI/CTypesExtra.hs  |  2 ++
+ src/prelude/FFI/FFI.hs          |  2 ++
+ src/prelude/FFI/Makefile        |  8 ++++----
+ src/prelude/FFI/MarshalAlloc.hs |  2 ++
+ src/prelude/FFI/MarshalUtils.hs |  2 ++
+ 9 files changed, 56 insertions(+), 18 deletions(-)
+ create mode 100644 src/prelude/FFI/CTypes1.hs
+ create mode 100644 src/prelude/FFI/CTypes2.hs
+
+diff --git a/src/prelude/FFI/CStrings.hs b/src/prelude/FFI/CStrings.hs
+index 18fdfa9..f1373cf 100644
+--- a/src/prelude/FFI/CStrings.hs
++++ b/src/prelude/FFI/CStrings.hs
+@@ -23,6 +23,8 @@ module NHC.FFI (
+ 
+ import MarshalArray
+ import CTypes
++import CTypes1
++import CTypes2
+ import Ptr
+ import Word
+ import Char
+diff --git a/src/prelude/FFI/CTypes.hs b/src/prelude/FFI/CTypes.hs
+index 18e9d60..942e7a1 100644
+--- a/src/prelude/FFI/CTypes.hs
++++ b/src/prelude/FFI/CTypes.hs
+@@ -4,11 +4,6 @@ module NHC.FFI
+ 	  -- Typeable, Storable, Bounded, Real, Integral, Bits
+ 	  CChar(..),    CSChar(..),  CUChar(..)
+ 	, CShort(..),   CUShort(..), CInt(..),    CUInt(..)
+-	, CLong(..),    CULong(..),  CLLong(..),  CULLong(..)
+-
+-	  -- Floating types, instances of: Eq, Ord, Num, Read, Show, Enum,
+-	  -- Typeable, Storable, Real, Fractional, Floating, RealFrac, RealFloat
+-	, CFloat(..),   CDouble(..), CLDouble(..)
+ 	) where
+ 
+ import NonStdUnsafeCoerce
+@@ -29,12 +24,3 @@ INTEGRAL_TYPE(CShort,Int16)
+ INTEGRAL_TYPE(CUShort,Word16)
+ INTEGRAL_TYPE(CInt,Int)
+ INTEGRAL_TYPE(CUInt,Word32)
+-INTEGRAL_TYPE(CLong,Int32)
+-INTEGRAL_TYPE(CULong,Word32)
+-INTEGRAL_TYPE(CLLong,Int64)
+-INTEGRAL_TYPE(CULLong,Word64)
+-
+-FLOATING_TYPE(CFloat,Float)
+-FLOATING_TYPE(CDouble,Double)
+--- HACK: Currently no long double in the FFI, so we simply re-use double
+-FLOATING_TYPE(CLDouble,Double)
+diff --git a/src/prelude/FFI/CTypes1.hs b/src/prelude/FFI/CTypes1.hs
+new file mode 100644
+index 0000000..81ba0f5
+--- /dev/null
++++ b/src/prelude/FFI/CTypes1.hs
+@@ -0,0 +1,20 @@
++{-# OPTIONS_COMPILE -cpp #-}
++module NHC.FFI
++	( CLong(..),    CULong(..),  CLLong(..),  CULLong(..)
++	) where
++
++import NonStdUnsafeCoerce
++import Int	( Int8,  Int16,  Int32,  Int64  )
++import Word	( Word8, Word16, Word32, Word64 )
++import Storable	( Storable(..) )
++-- import Data.Bits( Bits(..) )
++-- import NHC.SizedTypes
++import Monad	( liftM )
++import Ptr	( castPtr )
++
++#include "CTypes.h"
++
++INTEGRAL_TYPE(CLong,Int32)
++INTEGRAL_TYPE(CULong,Word32)
++INTEGRAL_TYPE(CLLong,Int64)
++INTEGRAL_TYPE(CULLong,Word64)
+diff --git a/src/prelude/FFI/CTypes2.hs b/src/prelude/FFI/CTypes2.hs
+new file mode 100644
+index 0000000..7d66242
+--- /dev/null
++++ b/src/prelude/FFI/CTypes2.hs
+@@ -0,0 +1,22 @@
++{-# OPTIONS_COMPILE -cpp #-}
++module NHC.FFI
++	( -- Floating types, instances of: Eq, Ord, Num, Read, Show, Enum,
++	  -- Typeable, Storable, Real, Fractional, Floating, RealFrac, RealFloat
++	CFloat(..), CDouble(..), CLDouble(..)
++	) where
++
++import NonStdUnsafeCoerce
++import Int	( Int8,  Int16,  Int32,  Int64  )
++import Word	( Word8, Word16, Word32, Word64 )
++import Storable	( Storable(..) )
++-- import Data.Bits( Bits(..) )
++-- import NHC.SizedTypes
++import Monad	( liftM )
++import Ptr	( castPtr )
++
++#include "CTypes.h"
++
++FLOATING_TYPE(CFloat,Float)
++FLOATING_TYPE(CDouble,Double)
++-- HACK: Currently no long double in the FFI, so we simply re-use double
++FLOATING_TYPE(CLDouble,Double)
+diff --git a/src/prelude/FFI/CTypesExtra.hs b/src/prelude/FFI/CTypesExtra.hs
+index ba3f15b..7cbdcbb 100644
+--- a/src/prelude/FFI/CTypesExtra.hs
++++ b/src/prelude/FFI/CTypesExtra.hs
+@@ -20,6 +20,8 @@ import Storable	( Storable(..) )
+ import Monad	( liftM )
+ import Ptr	( castPtr )
+ import CTypes
++import CTypes1
++import CTypes2
+ 
+ #include "CTypes.h"
+ 
+diff --git a/src/prelude/FFI/FFI.hs b/src/prelude/FFI/FFI.hs
+index 9d91e57..0c29394 100644
+--- a/src/prelude/FFI/FFI.hs
++++ b/src/prelude/FFI/FFI.hs
+@@ -217,6 +217,8 @@ import MarshalUtils	-- routines for basic marshalling
+ import MarshalError	-- routines for basic error-handling
+ 
+ import CTypes		-- newtypes for various C basic types
++import CTypes1
++import CTypes2
+ import CTypesExtra	-- types for various extra C types
+ import CStrings		-- C pointer to array of char
+ import CString		-- nhc98-only
+diff --git a/src/prelude/FFI/Makefile b/src/prelude/FFI/Makefile
+index 99065f8..e229672 100644
+--- a/src/prelude/FFI/Makefile
++++ b/src/prelude/FFI/Makefile
+@@ -18,7 +18,7 @@ EXTRA_C_FLAGS	=
+ SRCS = \
+ 	Addr.hs Ptr.hs FunPtr.hs Storable.hs \
+ 	ForeignObj.hs ForeignPtr.hs Int.hs Word.hs \
+-	CError.hs CTypes.hs CTypesExtra.hs CStrings.hs \
++	CError.hs CTypes.hs CTypes1.hs CTypes2.hs CTypesExtra.hs CStrings.hs \
+ 	MarshalAlloc.hs MarshalArray.hs MarshalError.hs MarshalUtils.hs \
+ 	StablePtr.hs
+ 
+@@ -38,12 +38,12 @@ Word.hs: Word.hs.cpp
+ # dependencies generated by hmake -Md: (and hacked by MW)
+ ${OBJDIR}/MarshalError.$O: ${OBJDIR}/Ptr.$O 
+ ${OBJDIR}/MarshalUtils.$O: ${OBJDIR}/Ptr.$O ${OBJDIR}/Storable.$O \
+-	${OBJDIR}/MarshalAlloc.$O ${OBJDIR}/CTypes.$O ${OBJDIR}/CTypesExtra.$O 
++	${OBJDIR}/MarshalAlloc.$O ${OBJDIR}/CTypes.$O ${OBJDIR}/CTypes1.$O ${OBJDIR}/CTypes2.$O ${OBJDIR}/CTypesExtra.$O
+ ${OBJDIR}/MarshalArray.$O: ${OBJDIR}/Ptr.$O ${OBJDIR}/Storable.$O \
+ 	${OBJDIR}/MarshalAlloc.$O ${OBJDIR}/MarshalUtils.$O 
+-${OBJDIR}/CTypesExtra.$O: ${OBJDIR}/Int.$O ${OBJDIR}/Word.$O ${OBJDIR}/CTypes.$O
++${OBJDIR}/CTypesExtra.$O: ${OBJDIR}/Int.$O ${OBJDIR}/Word.$O ${OBJDIR}/CTypes.$O ${OBJDIR}/CTypes1.$O ${OBJDIR}/CTypes2.$O
+ ${OBJDIR}/CTypes.$O: ${OBJDIR}/Int.$O ${OBJDIR}/Word.$O ${OBJDIR}/Storable.$O \
+-	${OBJDIR}/Ptr.$O 
++	${OBJDIR}/Ptr.$O ${OBJDIR}/CTypes1.$O ${OBJDIR}/CTypes2.$O
+ ${OBJDIR}/CStrings.$O: ${OBJDIR}/MarshalArray.$O ${OBJDIR}/CTypes.$O \
+ 	${OBJDIR}/Ptr.$O ${OBJDIR}/Word.$O
+ ${OBJDIR}/MarshalAlloc.$O: ${OBJDIR}/Ptr.$O ${OBJDIR}/Storable.$O \
+diff --git a/src/prelude/FFI/MarshalAlloc.hs b/src/prelude/FFI/MarshalAlloc.hs
+index 34ac7b3..5b43554 100644
+--- a/src/prelude/FFI/MarshalAlloc.hs
++++ b/src/prelude/FFI/MarshalAlloc.hs
+@@ -14,6 +14,8 @@ import ForeignPtr (FinalizerPtr(..))
+ import Storable
+ import CError
+ import CTypes
++import CTypes1
++import CTypes2
+ import CTypesExtra (CSize)
+ import NHC.DErrNo
+ 
+diff --git a/src/prelude/FFI/MarshalUtils.hs b/src/prelude/FFI/MarshalUtils.hs
+index 312719b..bd9d149 100644
+--- a/src/prelude/FFI/MarshalUtils.hs
++++ b/src/prelude/FFI/MarshalUtils.hs
+@@ -29,6 +29,8 @@ import Ptr
+ import Storable
+ import MarshalAlloc
+ import CTypes
++import CTypes1
++import CTypes2
+ import CTypesExtra
+ 
+ -- combined allocation and marshalling
+-- 
+2.11.0
